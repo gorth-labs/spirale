@@ -1,6 +1,6 @@
-# [Project name]
+# Spirale
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+AI QA testing agent that generates Playwright test steps via Gemini 2.5 Flash, runs them headless, and streams live results to an Allure-style report with PDF export.
 
 ## Run & Operate
 

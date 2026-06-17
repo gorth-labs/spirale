@@ -3,13 +3,15 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Spirale QA Agent API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: tests
+    description: Test run operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,106 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /tests:
+    get:
+      operationId: listTests
+      tags: [tests]
+      summary: List all test runs
+      responses:
+        "200":
+          description: List of test runs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TestRun"
+    post:
+      operationId: createTest
+      tags: [tests]
+      summary: Create and start a new test run
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TestInput"
+      responses:
+        "201":
+          description: Test run created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestRun"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /tests/stats:
+    get:
+      operationId: getTestStats
+      tags: [tests]
+      summary: Get dashboard statistics
+      responses:
+        "200":
+          description: Dashboard statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestStats"
+
+  /tests/{id}:
+    get:
+      operationId: getTest
+      tags: [tests]
+      summary: Get a test run with all steps and screenshots
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Test run detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestRunDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+    delete:
+      operationId: deleteTest
+      tags: [tests]
+      summary: Delete a test run
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +136,137 @@ components:
       required:
         - status
 
+    ApiError:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    TestInput:
+      type: object
+      required: [url, instructions]
+      properties:
+        url:
+          type: string
+        instructions:
+          type: string
+
+    TestRun:
+      type: object
+      required: [id, url, instructions, status, createdAt, totalSteps, passedSteps, failedSteps]
+      properties:
+        id:
+          type: integer
+        url:
+          type: string
+        instructions:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, passed, failed, error]
+        createdAt:
+          type: string
+        completedAt:
+          type: ["string", "null"]
+        totalSteps:
+          type: integer
+        passedSteps:
+          type: integer
+        failedSteps:
+          type: integer
+        errorMessage:
+          type: ["string", "null"]
+
+    TestStep:
+      type: object
+      required: [id, runId, stepIndex, action, description, status, createdAt]
+      properties:
+        id:
+          type: integer
+        runId:
+          type: integer
+        stepIndex:
+          type: integer
+        action:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, passed, failed, skipped]
+        durationMs:
+          type: ["integer", "null"]
+        errorMessage:
+          type: ["string", "null"]
+        screenshotUrl:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    Screenshot:
+      type: object
+      required: [id, runId, capturedAt, imageData]
+      properties:
+        id:
+          type: integer
+        runId:
+          type: integer
+        capturedAt:
+          type: string
+        imageData:
+          type: string
+
+    TestRunDetail:
+      type: object
+      required: [id, url, instructions, status, createdAt, totalSteps, passedSteps, failedSteps, steps, screenshots]
+      properties:
+        id:
+          type: integer
+        url:
+          type: string
+        instructions:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, passed, failed, error]
+        createdAt:
+          type: string
+        completedAt:
+          type: ["string", "null"]
+        totalSteps:
+          type: integer
+        passedSteps:
+          type: integer
+        failedSteps:
+          type: integer
+        errorMessage:
+          type: ["string", "null"]
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/TestStep"
+        screenshots:
+          type: array
+          items:
+            $ref: "#/components/schemas/Screenshot"
+
+    TestStats:
+      type: object
+      required: [total, passed, failed, running, successRate, recentRuns]
+      properties:
+        total:
+          type: integer
+        passed:
+          type: integer
+        failed:
+          type: integer
+        running:
+          type: integer
+        successRate:
+          type: number
+        recentRuns:
+          type: array
+          items:
+            $ref: "#/components/schemas/TestRun"

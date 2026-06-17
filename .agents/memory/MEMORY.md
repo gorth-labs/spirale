@@ -1,0 +1,1 @@
+- [Playwright in Nix](playwright-nix.md) — system Chromium via Nix, not Playwright's bundled headless-shell (missing .so files)

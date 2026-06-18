@@ -4,8 +4,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { Activity, CheckCircle, XCircle, Percent, PlusCircle } from "lucide-react";
-import { format } from "date-fns";
+import { Activity, CheckCircle, XCircle, Percent, PlusCircle, Clock } from "lucide-react";
+import { format, differenceInSeconds } from "date-fns";
+
+function fmtDuration(createdAt: string, completedAt: string | null | undefined): string {
+  if (!completedAt) return "—";
+  const sec = differenceInSeconds(new Date(completedAt), new Date(createdAt));
+  if (sec < 60) return `${sec}s`;
+  return `${Math.floor(sec / 60)}m ${sec % 60}s`;
+}
 
 export default function Dashboard() {
   const { data: stats, isLoading } = useGetTestStats();
@@ -55,7 +62,7 @@ export default function Dashboard() {
         </div>
 
         <h2 className="text-xl font-bold mb-4">Recent Runs</h2>
-        
+
         {isLoading ? (
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
@@ -70,6 +77,11 @@ export default function Dashboard() {
                   <th className="px-6 py-3 font-medium">URL</th>
                   <th className="px-6 py-3 font-medium">Status</th>
                   <th className="px-6 py-3 font-medium">Steps</th>
+                  <th className="px-6 py-3 font-medium">
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5" /> Duration
+                    </span>
+                  </th>
                   <th className="px-6 py-3 font-medium">Date</th>
                   <th className="px-6 py-3 font-medium"></th>
                 </tr>
@@ -81,7 +93,7 @@ export default function Dashboard() {
                       {run.url}
                     </td>
                     <td className="px-6 py-4">
-                      <Badge 
+                      <Badge
                         variant={run.status === "passed" ? "default" : run.status === "failed" || run.status === "error" ? "destructive" : "secondary"}
                         className={run.status === "passed" ? "bg-green-500 hover:bg-green-600" : ""}
                       >
@@ -90,8 +102,14 @@ export default function Dashboard() {
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-muted-foreground">
-                        <span className={run.passedSteps === run.totalSteps && run.totalSteps > 0 ? "text-green-500" : "text-foreground"}>{run.passedSteps}</span> / {run.totalSteps}
+                        <span className={run.passedSteps === run.totalSteps && run.totalSteps > 0 ? "text-green-500" : "text-foreground"}>
+                          {run.passedSteps}
+                        </span>{" "}
+                        / {run.totalSteps}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 font-mono text-muted-foreground">
+                      {fmtDuration(run.createdAt, (run as any).completedAt)}
                     </td>
                     <td className="px-6 py-4 text-muted-foreground">
                       {format(new Date(run.createdAt), "MMM d, HH:mm")}

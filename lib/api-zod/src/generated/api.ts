@@ -24,7 +24,7 @@ export const ListTestsResponseItem = zod.object({
   "id": zod.number(),
   "url": zod.string(),
   "instructions": zod.string(),
-  "status": zod.enum(['pending', 'running', 'passed', 'failed', 'error']),
+  "status": zod.enum(['draft', 'pending', 'running', 'passed', 'failed', 'error']),
   "createdAt": zod.string(),
   "completedAt": zod.string().nullish(),
   "totalSteps": zod.number(),
@@ -36,9 +36,18 @@ export const ListTestsResponse = zod.array(ListTestsResponseItem)
 
 
 /**
- * @summary Create and start a new test run
+ * @summary Create and start a new test run immediately (no review step)
  */
 export const CreateTestBody = zod.object({
+  "url": zod.string(),
+  "instructions": zod.string()
+})
+
+
+/**
+ * @summary Generate test steps for review (draft mode, no Playwright execution)
+ */
+export const PreviewTestBody = zod.object({
   "url": zod.string(),
   "instructions": zod.string()
 })
@@ -57,7 +66,7 @@ export const GetTestStatsResponse = zod.object({
   "id": zod.number(),
   "url": zod.string(),
   "instructions": zod.string(),
-  "status": zod.enum(['pending', 'running', 'passed', 'failed', 'error']),
+  "status": zod.enum(['draft', 'pending', 'running', 'passed', 'failed', 'error']),
   "createdAt": zod.string(),
   "completedAt": zod.string().nullish(),
   "totalSteps": zod.number(),
@@ -79,7 +88,7 @@ export const GetTestResponse = zod.object({
   "id": zod.number(),
   "url": zod.string(),
   "instructions": zod.string(),
-  "status": zod.enum(['pending', 'running', 'passed', 'failed', 'error']),
+  "status": zod.enum(['draft', 'pending', 'running', 'passed', 'failed', 'error']),
   "createdAt": zod.string(),
   "completedAt": zod.string().nullish(),
   "totalSteps": zod.number(),
@@ -92,7 +101,7 @@ export const GetTestResponse = zod.object({
   "stepIndex": zod.number(),
   "action": zod.string(),
   "description": zod.string(),
-  "status": zod.enum(['pending', 'running', 'passed', 'failed', 'skipped']),
+  "status": zod.enum(['draft', 'pending', 'running', 'passed', 'failed', 'skipped']),
   "durationMs": zod.number().nullish(),
   "errorMessage": zod.string().nullish(),
   "screenshotUrl": zod.string().nullish(),
@@ -116,6 +125,53 @@ export const DeleteTestParams = zod.object({
 
 export const DeleteTestResponse = zod.object({
   "error": zod.string()
+})
+
+
+/**
+ * @summary Launch execution of a draft test run
+ */
+export const RunTestParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const RunTestResponse = zod.object({
+  "id": zod.number(),
+  "url": zod.string(),
+  "instructions": zod.string(),
+  "status": zod.enum(['draft', 'pending', 'running', 'passed', 'failed', 'error']),
+  "createdAt": zod.string(),
+  "completedAt": zod.string().nullish(),
+  "totalSteps": zod.number(),
+  "passedSteps": zod.number(),
+  "failedSteps": zod.number(),
+  "errorMessage": zod.string().nullish()
+})
+
+
+/**
+ * @summary Regenerate a single draft step with a modification request
+ */
+export const RegenerateStepParams = zod.object({
+  "id": zod.coerce.number(),
+  "stepIndex": zod.coerce.number()
+})
+
+export const RegenerateStepBody = zod.object({
+  "modificationRequest": zod.string()
+})
+
+export const RegenerateStepResponse = zod.object({
+  "id": zod.number(),
+  "runId": zod.number(),
+  "stepIndex": zod.number(),
+  "action": zod.string(),
+  "description": zod.string(),
+  "status": zod.enum(['draft', 'pending', 'running', 'passed', 'failed', 'skipped']),
+  "durationMs": zod.number().nullish(),
+  "errorMessage": zod.string().nullish(),
+  "screenshotUrl": zod.string().nullish(),
+  "createdAt": zod.string()
 })
 
 

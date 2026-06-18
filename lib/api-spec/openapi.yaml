@@ -44,7 +44,7 @@ paths:
     post:
       operationId: createTest
       tags: [tests]
-      summary: Create and start a new test run
+      summary: Create and start a new test run immediately (no review step)
       requestBody:
         required: true
         content:
@@ -58,6 +58,31 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TestRun"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /tests/preview:
+    post:
+      operationId: previewTest
+      tags: [tests]
+      summary: Generate test steps for review (draft mode, no Playwright execution)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TestInput"
+      responses:
+        "201":
+          description: Draft test created with generated steps
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestRunDetail"
         "400":
           description: Bad request
           content:
@@ -126,6 +151,73 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiError"
 
+  /tests/{id}/run:
+    post:
+      operationId: runTest
+      tags: [tests]
+      summary: Launch execution of a draft test run
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Test launched
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestRun"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "409":
+          description: Test is not in draft status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /tests/{id}/steps/{stepIndex}/regenerate:
+    post:
+      operationId: regenerateStep
+      tags: [tests]
+      summary: Regenerate a single draft step with a modification request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: stepIndex
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegenerateStepInput"
+      responses:
+        "200":
+          description: Updated step
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestStep"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
 components:
   schemas:
     HealthStatus:
@@ -153,6 +245,13 @@ components:
         instructions:
           type: string
 
+    RegenerateStepInput:
+      type: object
+      required: [modificationRequest]
+      properties:
+        modificationRequest:
+          type: string
+
     TestRun:
       type: object
       required: [id, url, instructions, status, createdAt, totalSteps, passedSteps, failedSteps]
@@ -165,7 +264,7 @@ components:
           type: string
         status:
           type: string
-          enum: [pending, running, passed, failed, error]
+          enum: [draft, pending, running, passed, failed, error]
         createdAt:
           type: string
         completedAt:
@@ -195,7 +294,7 @@ components:
           type: string
         status:
           type: string
-          enum: [pending, running, passed, failed, skipped]
+          enum: [draft, pending, running, passed, failed, skipped]
         durationMs:
           type: ["integer", "null"]
         errorMessage:
@@ -230,7 +329,7 @@ components:
           type: string
         status:
           type: string
-          enum: [pending, running, passed, failed, error]
+          enum: [draft, pending, running, passed, failed, error]
         createdAt:
           type: string
         completedAt:

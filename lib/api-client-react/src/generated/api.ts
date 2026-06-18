@@ -22,10 +22,12 @@ import type {
 import type {
   ApiError,
   HealthStatus,
+  RegenerateStepInput,
   TestInput,
   TestRun,
   TestRunDetail,
-  TestStats
+  TestStats,
+  TestStep
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -204,7 +206,7 @@ export const getCreateTestUrl = () => {
 }
 
 /**
- * @summary Create and start a new test run
+ * @summary Create and start a new test run immediately (no review step)
  */
 export const createTest = async (testInput: TestInput, options?: RequestInit): Promise<TestRun> => {
 
@@ -253,7 +255,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type CreateTestMutationError = ErrorType<ApiError>
 
     /**
- * @summary Create and start a new test run
+ * @summary Create and start a new test run immediately (no review step)
  */
 export const useCreateTest = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTest>>, TError,{data: BodyType<TestInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -264,6 +266,77 @@ export const useCreateTest = <TError = ErrorType<ApiError>,
         TContext
       > => {
       return useMutation(getCreateTestMutationOptions(options));
+    }
+
+export const getPreviewTestUrl = () => {
+
+
+
+
+  return `/api/tests/preview`
+}
+
+/**
+ * @summary Generate test steps for review (draft mode, no Playwright execution)
+ */
+export const previewTest = async (testInput: TestInput, options?: RequestInit): Promise<TestRunDetail> => {
+
+  return customFetch<TestRunDetail>(getPreviewTestUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      testInput,)
+  }
+);}
+
+
+
+
+export const getPreviewTestMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewTest>>, TError,{data: BodyType<TestInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewTest>>, TError,{data: BodyType<TestInput>}, TContext> => {
+
+const mutationKey = ['previewTest'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewTest>>, {data: BodyType<TestInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  previewTest(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewTestMutationResult = NonNullable<Awaited<ReturnType<typeof previewTest>>>
+    export type PreviewTestMutationBody = BodyType<TestInput>
+    export type PreviewTestMutationError = ErrorType<ApiError>
+
+    /**
+ * @summary Generate test steps for review (draft mode, no Playwright execution)
+ */
+export const usePreviewTest = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewTest>>, TError,{data: BodyType<TestInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewTest>>,
+        TError,
+        {data: BodyType<TestInput>},
+        TContext
+      > => {
+      return useMutation(getPreviewTestMutationOptions(options));
     }
 
 export const getGetTestStatsUrl = () => {
@@ -488,5 +561,149 @@ export const useDeleteTest = <TError = ErrorType<ApiError>,
         TContext
       > => {
       return useMutation(getDeleteTestMutationOptions(options));
+    }
+
+export const getRunTestUrl = (id: number,) => {
+
+
+
+
+  return `/api/tests/${id}/run`
+}
+
+/**
+ * @summary Launch execution of a draft test run
+ */
+export const runTest = async (id: number, options?: RequestInit): Promise<TestRun> => {
+
+  return customFetch<TestRun>(getRunTestUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getRunTestMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runTest>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof runTest>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['runTest'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof runTest>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  runTest(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RunTestMutationResult = NonNullable<Awaited<ReturnType<typeof runTest>>>
+
+    export type RunTestMutationError = ErrorType<ApiError>
+
+    /**
+ * @summary Launch execution of a draft test run
+ */
+export const useRunTest = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runTest>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof runTest>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getRunTestMutationOptions(options));
+    }
+
+export const getRegenerateStepUrl = (id: number,
+    stepIndex: number,) => {
+
+
+
+
+  return `/api/tests/${id}/steps/${stepIndex}/regenerate`
+}
+
+/**
+ * @summary Regenerate a single draft step with a modification request
+ */
+export const regenerateStep = async (id: number,
+    stepIndex: number,
+    regenerateStepInput: RegenerateStepInput, options?: RequestInit): Promise<TestStep> => {
+
+  return customFetch<TestStep>(getRegenerateStepUrl(id,stepIndex),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      regenerateStepInput,)
+  }
+);}
+
+
+
+
+export const getRegenerateStepMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof regenerateStep>>, TError,{id: number;stepIndex: number;data: BodyType<RegenerateStepInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof regenerateStep>>, TError,{id: number;stepIndex: number;data: BodyType<RegenerateStepInput>}, TContext> => {
+
+const mutationKey = ['regenerateStep'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof regenerateStep>>, {id: number;stepIndex: number;data: BodyType<RegenerateStepInput>}> = (props) => {
+          const {id,stepIndex,data} = props ?? {};
+
+          return  regenerateStep(id,stepIndex,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RegenerateStepMutationResult = NonNullable<Awaited<ReturnType<typeof regenerateStep>>>
+    export type RegenerateStepMutationBody = BodyType<RegenerateStepInput>
+    export type RegenerateStepMutationError = ErrorType<ApiError>
+
+    /**
+ * @summary Regenerate a single draft step with a modification request
+ */
+export const useRegenerateStep = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof regenerateStep>>, TError,{id: number;stepIndex: number;data: BodyType<RegenerateStepInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof regenerateStep>>,
+        TError,
+        {id: number;stepIndex: number;data: BodyType<RegenerateStepInput>},
+        TContext
+      > => {
+      return useMutation(getRegenerateStepMutationOptions(options));
     }
 

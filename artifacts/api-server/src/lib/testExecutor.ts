@@ -7,7 +7,7 @@ import { logger } from "./logger";
 
 export type SseEmitter = (event: string, data: unknown) => void;
 
-interface TestStepSpec {
+export interface TestStepSpec {
   action: string;
   description: string;
   selector?: string;
@@ -35,7 +35,7 @@ interface TestStepSpec {
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
-async function generateTestSteps(url: string, instructions: string): Promise<TestStepSpec[]> {
+export async function generateTestSteps(url: string, instructions: string): Promise<TestStepSpec[]> {
   const model = genAI.getGenerativeModel({
     model: "gemini-2.5-flash",
     generationConfig: {
@@ -94,6 +94,49 @@ Example:
 
   const steps = JSON.parse(jsonMatch[0]) as TestStepSpec[];
   return steps;
+}
+
+export async function regenerateSingleStep(
+  url: string,
+  instructions: string,
+  allSteps: TestStepSpec[],
+  targetIndex: number,
+  modificationRequest: string
+): Promise<TestStepSpec> {
+  const model = genAI.getGenerativeModel({
+    model: "gemini-2.5-flash",
+    generationConfig: { maxOutputTokens: 4096, temperature: 0.2 },
+  });
+
+  const surrounding = allSteps
+    .slice(Math.max(0, targetIndex - 2), targetIndex + 3)
+    .map((s, i) => `  Step ${Math.max(0, targetIndex - 2) + i + 1}: [${s.action}] ${s.description}`)
+    .join("\n");
+
+  const prompt = `You are a Playwright test automation expert.
+
+Test context:
+URL: ${url}
+Instructions: ${instructions}
+
+Surrounding steps for context:
+${surrounding}
+
+Current step ${targetIndex + 1} (JSON):
+${JSON.stringify(allSteps[targetIndex], null, 2)}
+
+The user wants to modify this step: "${modificationRequest}"
+
+Return ONLY a single valid JSON object (not an array) for the replacement step.
+The object must include "action" and "description" plus any needed fields (selector, value, url, key, expected, ms, etc).
+RETURN ONLY THE JSON OBJECT, NO EXPLANATION.`;
+
+  const result = await model.generateContent(prompt);
+  const text = result.response.text().trim();
+
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error("Gemini did not return valid JSON object");
+  return JSON.parse(jsonMatch[0]) as TestStepSpec;
 }
 
 async function executeAction(
@@ -536,6 +579,156 @@ async function executeAction(
 
     default:
       logger.warn({ action: step.action }, "Unknown action, skipping");
+  }
+}
+
+export async function runTestFromSavedSteps(runId: number, emit: SseEmitter): Promise<void> {
+  let browser: Browser | null = null;
+
+  try {
+    const [run] = await db.select().from(testRunsTable).where(eq(testRunsTable.id, runId));
+    if (!run) throw new Error(`Test run ${runId} not found`);
+
+    await db.update(testRunsTable).set({ status: "running" }).where(eq(testRunsTable.id, runId));
+
+    const savedSteps = await db
+      .select()
+      .from(testStepsTable)
+      .where(eq(testStepsTable.runId, runId))
+      .orderBy(testStepsTable.stepIndex);
+
+    if (savedSteps.length === 0) throw new Error("No saved steps found for this test run");
+
+    const stepSpecs: TestStepSpec[] = savedSteps.map((s) => {
+      try { return JSON.parse(s.spec ?? "{}") as TestStepSpec; }
+      catch { return { action: s.action, description: s.description } as TestStepSpec; }
+    });
+
+    const systemChromium =
+      process.env.PLAYWRIGHT_EXECUTABLE_PATH ||
+      "/nix/store/qa9cnw4v5xkxyip6mb9kxqfq1z4x2dx1-chromium-138.0.7204.100/bin/chromium";
+
+    browser = await chromium.launch({
+      headless: true,
+      executablePath: systemChromium,
+      args: [
+        "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage",
+        "--disable-accelerated-2d-canvas", "--no-first-run", "--no-zygote",
+        "--disable-gpu", "--disable-features=VizDisplayCompositor",
+      ],
+    });
+
+    const context = await browser.newContext({
+      viewport: { width: 1280, height: 720 },
+      userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      ignoreHTTPSErrors: true,
+    });
+
+    context.on("dialog", async (dialog) => { await dialog.dismiss().catch(() => {}); });
+
+    const page = await context.newPage();
+
+    let screenshotInterval: ReturnType<typeof setInterval> | null = null;
+    const startScreenshotCapture = () => {
+      screenshotInterval = setInterval(async () => {
+        try {
+          const buf = await page.screenshot({ type: "png" });
+          const imageData = buf.toString("base64");
+          const [ss] = await db.insert(screenshotsTable).values({ runId, imageData }).returning();
+          emit("screenshot", { id: ss.id, runId, capturedAt: ss.capturedAt.toISOString(), imageData });
+        } catch (_) {}
+      }, 1000);
+    };
+
+    startScreenshotCapture();
+
+    let passedSteps = 0;
+    let failedSteps = 0;
+    let currentPage = page;
+
+    for (let i = 0; i < stepSpecs.length; i++) {
+      const spec      = stepSpecs[i];
+      const savedStep = savedSteps[i];
+
+      await db.update(testStepsTable).set({ status: "running" }).where(eq(testStepsTable.id, savedStep.id));
+      emit("step", { ...savedStep, status: "running", createdAt: savedStep.createdAt.toISOString() });
+
+      const startTime = Date.now();
+      let status: "passed" | "failed" = "passed";
+      let errorMessage: string | undefined;
+
+      try {
+        await executeAction(currentPage, context, spec);
+        passedSteps++;
+      } catch (err) {
+        status = "failed";
+        errorMessage = err instanceof Error ? err.message : String(err);
+        failedSteps++;
+        logger.warn({ action: spec.action, error: errorMessage }, "Step failed");
+        try {
+          const buf = await currentPage.screenshot({ type: "png" });
+          await db.insert(screenshotsTable).values({ runId, imageData: buf.toString("base64") });
+        } catch (_) {}
+      }
+
+      const durationMs = Date.now() - startTime;
+
+      await db
+        .update(testStepsTable)
+        .set({ status, durationMs, errorMessage: errorMessage || null })
+        .where(eq(testStepsTable.id, savedStep.id));
+
+      await db.update(testRunsTable).set({ passedSteps, failedSteps }).where(eq(testRunsTable.id, runId));
+
+      emit("step", {
+        ...savedStep,
+        status,
+        durationMs,
+        errorMessage: errorMessage || null,
+        createdAt: savedStep.createdAt.toISOString(),
+      });
+    }
+
+    if (screenshotInterval) clearInterval(screenshotInterval);
+
+    try {
+      const buf = await currentPage.screenshot({ type: "png" });
+      const imageData = buf.toString("base64");
+      const [ss] = await db.insert(screenshotsTable).values({ runId, imageData }).returning();
+      emit("screenshot", { id: ss.id, runId, capturedAt: ss.capturedAt.toISOString(), imageData });
+    } catch (_) {}
+
+    const finalStatus = failedSteps === 0 ? "passed" : "failed";
+    const [finalRun] = await db
+      .update(testRunsTable)
+      .set({ status: finalStatus, passedSteps, failedSteps, completedAt: new Date() })
+      .where(eq(testRunsTable.id, runId))
+      .returning();
+
+    emit("done", {
+      ...finalRun,
+      createdAt:   finalRun.createdAt.toISOString(),
+      completedAt: finalRun.completedAt?.toISOString() ?? null,
+    });
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    logger.error({ runId, error: errorMessage }, "runTestFromSavedSteps failed");
+
+    await db
+      .update(testRunsTable)
+      .set({ status: "error", errorMessage, completedAt: new Date() })
+      .where(eq(testRunsTable.id, runId));
+
+    const [finalRun] = await db.select().from(testRunsTable).where(eq(testRunsTable.id, runId));
+    if (finalRun) {
+      emit("error_event", {
+        ...finalRun,
+        createdAt:   finalRun.createdAt.toISOString(),
+        completedAt: finalRun.completedAt?.toISOString() ?? null,
+      });
+    }
+  } finally {
+    if (browser) await browser.close().catch(() => {});
   }
 }
 

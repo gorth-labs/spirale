@@ -7,6 +7,7 @@ import Home from "@/pages/Home";
 import Dashboard from "@/pages/Dashboard";
 import NewTest from "@/pages/NewTest";
 import TestDetail from "@/pages/TestDetail";
+import StepReview from "@/pages/StepReview";
 
 const queryClient = new QueryClient();
 
@@ -16,6 +17,7 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/test/new" component={NewTest} />
+      <Route path="/step-review/:id" component={StepReview} />
       <Route path="/test/:id" component={TestDetail} />
       <Route component={NotFound} />
     </Switch>

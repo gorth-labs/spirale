@@ -10,6 +10,7 @@ export type TestRunStatus = typeof TestRunStatus[keyof typeof TestRunStatus];
 
 
 export const TestRunStatus = {
+  draft: 'draft',
   pending: 'pending',
   running: 'running',
   passed: 'passed',

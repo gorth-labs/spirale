@@ -8,6 +8,7 @@
 
 export * from './apiError';
 export * from './healthStatus';
+export * from './regenerateStepInput';
 export * from './screenshot';
 export * from './testInput';
 export * from './testRun';

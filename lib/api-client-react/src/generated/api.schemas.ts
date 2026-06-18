@@ -18,10 +18,15 @@ export interface TestInput {
   instructions: string;
 }
 
+export interface RegenerateStepInput {
+  modificationRequest: string;
+}
+
 export type TestRunStatus = typeof TestRunStatus[keyof typeof TestRunStatus];
 
 
 export const TestRunStatus = {
+  draft: 'draft',
   pending: 'pending',
   running: 'running',
   passed: 'passed',
@@ -48,6 +53,7 @@ export type TestStepStatus = typeof TestStepStatus[keyof typeof TestStepStatus];
 
 
 export const TestStepStatus = {
+  draft: 'draft',
   pending: 'pending',
   running: 'running',
   passed: 'passed',
@@ -82,6 +88,7 @@ export type TestRunDetailStatus = typeof TestRunDetailStatus[keyof typeof TestRu
 
 
 export const TestRunDetailStatus = {
+  draft: 'draft',
   pending: 'pending',
   running: 'running',
   passed: 'passed',

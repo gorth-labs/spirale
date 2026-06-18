@@ -8,7 +8,8 @@ export const testStepsTable = pgTable("test_steps", {
   stepIndex: integer("step_index").notNull(),
   action: text("action").notNull(),
   description: text("description").notNull(),
-  status: text("status").notNull().default("pending"), // pending|running|passed|failed|skipped
+  status: text("status").notNull().default("pending"), // draft|pending|running|passed|failed|skipped
+  spec: text("spec"), // JSON-stringified full TestStepSpec, set during preview/draft phase
   durationMs: integer("duration_ms"),
   errorMessage: text("error_message"),
   screenshotUrl: text("screenshot_url"),

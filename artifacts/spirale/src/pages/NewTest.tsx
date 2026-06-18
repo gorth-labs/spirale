@@ -1,16 +1,15 @@
-import { useCreateTest } from "@workspace/api-client-react";
+import { usePreviewTest } from "@workspace/api-client-react";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Play } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
 const testSchema = z.object({
   url: z.string().url({ message: "Please enter a valid URL" }),
@@ -19,22 +18,19 @@ const testSchema = z.object({
 
 export default function NewTest() {
   const [, setLocation] = useLocation();
-  const createTest = useCreateTest();
+  const previewTest = usePreviewTest();
 
   const form = useForm<z.infer<typeof testSchema>>({
     resolver: zodResolver(testSchema),
-    defaultValues: {
-      url: "",
-      instructions: "",
-    },
+    defaultValues: { url: "", instructions: "" },
   });
 
   function onSubmit(values: z.infer<typeof testSchema>) {
-    createTest.mutate(
+    previewTest.mutate(
       { data: values },
       {
         onSuccess: (data) => {
-          setLocation(`/test/${data.id}`);
+          setLocation(`/step-review/${data.id}`);
         },
       }
     );
@@ -45,13 +41,18 @@ export default function NewTest() {
       <div className="p-8 max-w-4xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold">New Test Run</h1>
-          <p className="text-muted-foreground mt-2">Deploy the Spirale agent to verify a web application.</p>
+          <p className="text-muted-foreground mt-2">
+            Deploy the Spirale agent to verify a web application.
+          </p>
         </div>
 
         <Card>
           <CardHeader>
             <CardTitle>Test Configuration</CardTitle>
-            <CardDescription>Enter the target URL and describe what you want the agent to verify.</CardDescription>
+            <CardDescription>
+              Enter the target URL and describe what you want the agent to verify. AI will generate
+              the test steps for you to review before running.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
@@ -77,10 +78,10 @@ export default function NewTest() {
                     <FormItem>
                       <FormLabel>Instructions</FormLabel>
                       <FormControl>
-                        <Textarea 
-                          placeholder="Describe what to test in plain English or French..." 
+                        <Textarea
+                          placeholder="Describe what to test in plain English or French..."
                           className="min-h-[150px] resize-y"
-                          {...field} 
+                          {...field}
                         />
                       </FormControl>
                       <FormMessage />
@@ -88,14 +89,21 @@ export default function NewTest() {
                   )}
                 />
 
+                {previewTest.isPending && (
+                  <div className="rounded-lg border bg-muted/40 px-4 py-3 text-sm text-muted-foreground flex items-center gap-3">
+                    <span className="w-4 h-4 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin flex-shrink-0" />
+                    Gemini is generating your test steps — this takes about 10–20 seconds…
+                  </div>
+                )}
+
                 <div className="flex justify-end pt-4">
-                  <Button type="submit" disabled={createTest.isPending} className="gap-2">
-                    {createTest.isPending ? (
+                  <Button type="submit" disabled={previewTest.isPending} className="gap-2">
+                    {previewTest.isPending ? (
                       <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
                     ) : (
-                      <Play className="w-4 h-4" />
+                      <Sparkles className="w-4 h-4" />
                     )}
-                    Run Test
+                    Generate Steps
                   </Button>
                 </div>
               </form>
